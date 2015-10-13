@@ -1,7 +1,7 @@
 # Master Thesis
 
 ### thesis.pdf
-My master thesis - "Evaluating Forecasts of Volatile Electricity Prices made by Competing Models". The main purposes are 
+My master thesis - "Evaluating Forecasts of Volatile Electricity Prices made by Competing Models". The main goals of the thesis are 
 
 1. provide an introduction to the german electricity market with a focus on how fundamentals affect prices through supply/demand effects. 
 2. give an overview of available data and data sources.
