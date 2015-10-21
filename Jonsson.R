@@ -1,12 +1,12 @@
 
-# Model: Two-Step Local linear approximation with Holt-Winters for errors.
+# Model: Two-Step Local linear approximation model.
 # Features:
-# Filter extreme values in estimation (<0 DKK, >800 DKK)
-# Daily updating parameters
-# Forgetness factor
-# Influence limiter
+# Filters extreme values in estimation (<0 DKK, >800 DKK)
+# Daily updating of parameters
+# Exponential decay, such that more recent observations have larger weigth
 
-# TODO: Optimize updatings procedure.
+# Note this code was written while I learned R, so formulations are not always street smart or fast - but it worked for me. 
+# The code is meant as inspiration, but implementation will probably need some tweaking on your part.½
 
 ##  Initialization  ##
 library(xts)
