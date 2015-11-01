@@ -1,7 +1,8 @@
 # Master Thesis
+My master thesis "Evaluating Forecasts of Volatile Electricity Prices made by Competing Models".
 
 ### thesis.pdf
-My master thesis - "Evaluating Forecasts of Volatile Electricity Prices made by Competing Models". The main goals of the thesis are 
+The main goals of the thesis are 
 
 1. provide an introduction to the german electricity market with a focus on how fundamentals affect prices through supply/demand effects. 
 2. give an overview of available data and data sources.
@@ -18,4 +19,4 @@ The data included are only the publicly available data (TSO forecasts of fundame
 
 The data covers forecast wind, forecast solar, and forecast consumption taken from the TSO's, and realized prices for the Austrian exchange EXAA. All for the period 01-11-2012 to 31-12-2014. For a list of sources and a description of the preprocessing applied see thesis.pdf. For newer data check ENTSOE and EXAA.
 
-If you have proprietary forecast data, good for you. You will likely get marginally worse forecast performance as the TSO's have pretty good forecast aggregation schemes (to the best of my knowledge). And remember, when forecasting DA prices you are not interested in how precise your forecast is compared to the realized fundamentals. You want to forecast the market players expectations of fundamentals (which are unknown).
+If you have proprietary forecast data, good for you. You will likely get marginally worse forecast performance using this data than the TSO forecasts, as the TSO's have pretty good forecast aggregation schemes (to the best of my knowledge). And remember, when forecasting DA prices you are not interested in how precise your forecast is compared to the realized fundamentals. You want to forecast the market players expectations of fundamentals (which are difficult to know).
