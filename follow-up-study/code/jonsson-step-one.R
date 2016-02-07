@@ -12,51 +12,48 @@
 library(xts)
 library(akima)
 library(compiler)
-enableJIT(2)
+enableJIT(2) # Gives a minor speed boost by pre-compiling functions
 
+setwd("C:/Users/Glavind/git/ForecastingElectricityPrices/code")
 ptmS <- Sys.time()
-
-setwd("C:/Users/Glavind/Dropbox/_Thesis/a_code/")
-#setwd("/home/rstudio/")
 Sys.setenv(TZ='UTC')
-
-d <- read.csv('data/tso-data.csv')
-timestamp <- strptime(d[,1], format="%Y-%m-%d %H:%M")
-
-dat <- xts(d[,2:ncol(d)], timestamp)
-rm(d, timestamp)
 
 burnin.start <-  as.POSIXct("2012-11-01 00:00")
 burnin.end <-    as.POSIXct("2012-12-12 23:00")
 
 train.start <-  as.POSIXct("2012-12-13 00:00")
-train.end <-    as.POSIXct("2013-12-31 23:00")
+train.end <-    as.POSIXct("2014-12-31 23:00")
 
-test.start <-   as.POSIXct("2014-01-01 00:00")
-test.end <-     as.POSIXct("2014-12-28 23:00")
-
-savedates <- as.POSIXct("2014-07-15")
-savedcurves <- list()
+test.start <-   as.POSIXct("2015-01-01 00:00")
+test.end <-     as.POSIXct("2015-12-31 23:00")
 
 # Fitting points:
 u1.fitpoints = 24
 u2.fitpoints = 24
 
-# Dummy for using train only else use test data
+# Dummy for using train only else use whole data set
 isTrain <- FALSE 
+
+## Read Data ##
+d <- read.csv('../data/tso-data-updated.csv')
+timestamp <- strptime(d[,1], format="%d/%m/%Y %H:%M")
+dat <- xts(d[,2:ncol(d)], timestamp)
+rm(d, timestamp)
+
+# saves the forecast surface for these dates which is usefull for explaining intuition and diagnostics.
+savedates <- NULL 
+savedcurves <- list()
 
 ###  PREPROCESS  ###
 
 # Make a copy of data
 # PRI_DE, CON_DE, PRO_DE_WND + PRO_DE_SPV, PRI_DE
-#a <- cbind(dat[,1], dat[,4]/1000, (dat[,6] + dat[,7])/1000, dat[,1])
-a <- cbind(dat[,1], dat[,4]/1000, (dat[,6] + dat[,7])/1000, dat[,1])
+a <- cbind(dat[,"PRI_DE"], dat[,"CON_DE"]/1000, (dat[,"PRO_DE_WND"] + dat[,"PRO_DE_SPV"])/1000, dat[,"PRI_DE"])
 colnames(a) <- c("PRI_DE","CON_DE","PRO_DE_RES", "Realized Prc")
 
 ## Perform censoring of PRI_DE ##
-dMinPrc <- 0    # replaces 162 obs
-dMaxPrc <- 110  # replaces 8 obs
-# Censors prices: 106 total in train, 64 in test
+dMinPrc <- 0
+dMaxPrc <- 110
 a[a[,1] < dMinPrc, 1] <- dMinPrc       # Replace values lower than limit
 a[a[,1] > dMaxPrc, 1] <- dMaxPrc       # Replace values higher than limit
 
@@ -74,7 +71,7 @@ rm(aT, dMinPrc, dMaxPrc, dat)
 
 ### INITIALIZE MODEL ###
 
-## Define Functions ##
+## Define Helper Functions ##
 triCube <- function(x){   as.double(ifelse( x>=0 & x<1, (1-x^3)^3, 0)) }  # Tricube function
 huber <- function(x, t){  as.double(sign(x)*min(abs(x),t)) }           # Huber function
 delta <- function(x, t){  as.double(ifelse(abs(x)<t, 1, 0)) }          # Delta of huber function
@@ -94,7 +91,7 @@ u2 = seq(from = -1, to = 1, length.out = u2.fitpoints)
 ## Expand fitpoints for use in Akima interpolation ##
 xy <- expand.grid(u1,u2)
 
-## Intialize matrixes of lists holding variables ##
+## Intialize matrixes of lists holding variables in each fitting point ##
 p = matrix(list(), nrow = u1.fitpoints, ncol=u2.fitpoints) # Parameter vector (6*1)
 R = matrix(list(), nrow = u1.fitpoints, ncol=u2.fitpoints) # R matrix (6*6)
 u = matrix(list(), nrow = u1.fitpoints, ncol=u2.fitpoints) # u fitpoint values (2*1)
@@ -121,15 +118,11 @@ if(isTrain){
 ### END INITIALIZE ###
 
 ### Jonsson et al. MODEL ###
-jonsson.model <- function(param, printInfo){
+jonsson.model <- function(param, printInfo, rmseOnly){
   # Set tune parameters
   gamma = param[1]
   lambda = param[2]
   tau   = param[3]
-#   gamma = 0.8
-#   lambda = 0.99
-#   tau = 25
-#   debug=TRUE
   
   if(printInfo){
     cat("\nGamma: ", gamma, sep="")
@@ -162,7 +155,7 @@ jonsson.model <- function(param, printInfo){
     # Report status
     if(printInfo){
       if(i%%100==0){
-        cat("\n", formatC(i+1,width=3,format="d", flag="0"), "/", nrow(yt)/24,"..", sep="")
+        cat("\n", formatC(i+1,width=3,format="d", flag="0"), "/", nrow(yt)/24,"  ", sep="")
         ptmD <- Sys.time()
       } else if (i%%10==0){
         cat("|", sep="")
@@ -240,7 +233,7 @@ jonsson.model <- function(param, printInfo){
           # Calculate R matrix - allow larger updates in burn
           R[[cVar1,cVar2]] <- lambdaEff * R[[cVar1,cVar2]] + weight * ifelse(isBurn, 1, delta(eps, tau)) * toPoly(point) %*% t(toPoly(point))
           
-          #Dont update p for the first 100 observations - can give problem with oscillating p values.
+          #Dont update p for the first 100 observations - can give problem with oscillating values in p.
           if((24*i + j)>100){       
             p[[cVar1,cVar2]] <- p[[cVar1,cVar2]] + weight * huber(eps, tau) * as.vector(solve(R[[cVar1,cVar2]]) %*% toPoly(point))
           }
@@ -253,76 +246,81 @@ jonsson.model <- function(param, printInfo){
   ## Handle results ##
   # Write forecast and actual series 
   if(isTrain){
+    #Save train performance
     timestamp <- as.POSIXct(index(a[seq(burnin.start, train.end, by=60)]), format="%y-%m-%d %H:%M") #if train
     xtsForecast <- xts(cbind(forc,actual), timestamp)[seq(train.start, train.end, by=60)]
   } else {
     #Save train performance
     timestamp <- as.POSIXct(index(a[seq(burnin.start, test.end, by=60)]), format="%y-%m-%d %H:%M") #if train
     xtsForecast <- xts(cbind(forc,actual), timestamp)[seq(burnin.start, train.end, by=60)]
-    write.csv(as.data.frame(xtsForecast), file='data/forecasts/train/jonsson-step1.csv')
+    write.csv(as.data.frame(xtsForecast), file='../forecasts/train/jonsson-step1.csv')
     
     #Save test performance
     timestamp <- as.POSIXct(index(a[seq(burnin.start, test.end, by=60)]), format="%y-%m-%d %H:%M") #if train
     xtsForecast <- xts(cbind(forc,actual), timestamp)[seq(test.start, test.end, by=60)]
-    write.csv(as.data.frame(xtsForecast), file='data/forecasts/test/jonsson-step1.csv')
+    write.csv(as.data.frame(xtsForecast), file='../forecasts/test/jonsson-step1.csv')
     
     #Continue
-    timestamp <- as.POSIXct(index(a[seq(burnin.start, test.end, by=60)]), format="%y-%m-%d %H:%M") #if train
-    xtsForecast <- xts(cbind(forc,actual), timestamp)[seq(train.start, test.end, by=60)]
+    #timestamp <- as.POSIXct(index(a[seq(burnin.start, test.end, by=60)]), format="%y-%m-%d %H:%M") #if train
+    #xtsForecast <- xts(cbind(forc,actual), timestamp)[seq(train.start, test.end, by=60)]
   }
 
   # Write above results including error measures
   summaryForecast <- cbind(xtsForecast, abs(xtsForecast[,2] - xtsForecast[,1]), (xtsForecast[,2] - xtsForecast[,1])^2)
   names(summaryForecast) <- c('forecast','actual','abs.error','sq.error')
-  summaryForecast['2012-12-24/25',3:4] <- NA
-  write.csv(as.data.frame(summaryForecast), file='data/forecasts/jonsson-standard-forecasts-step1.csv')
+  write.csv(as.data.frame(summaryForecast), file='../forecasts/jonsson-standard-forecasts-step1.csv')
 
   # Format output to function
   returnval <- sapply(summaryForecast, FUN = mean, na.rm=TRUE)[3:4]
   returnval[2] <- sqrt(returnval[2])
   names(returnval) <- c('MAE','RMSE')
 
-  return(returnval)
-  #return(returnval[2])
+  if(rmseOnly){
+    return(returnval[2])
+  } else {
+    return(returnval)
+  }
+  
   ## END MODEL ##
 }
 
-# Original values
-# gamma   = 0.8529
-# lambda  = 0.9877
-# tau     = 55.67/7.45 = 7.47
+#################
+### Run model ###
+#################
 
-gauss <- function(x){(1 + exp(-x))^(-1)}
-gauss.inv <- function(x){-log((1/x)-1)}
-bfgs.transform <- function(x){1/2*(1 + gauss(x))}
-bfgs.transform.inv <- function(x){gauss.inv(x*2-1)}
+##########################################
+## Optimize tune parameters using BFGS ###
+##########################################
 
-jonsson.model.bfgs <- function(par){
-  trpar <- matrix(nrow = 3, ncol = 1)
-  trpar[1] <- bfgs.transform(par[1])
-  trpar[2] <- bfgs.transform(par[2])
-  trpar[3] <- exp(par[3])
-  jonsson.model(trpar, TRUE)
-}
+  ## helper functions ##
+  gauss <- function(x){(1 + exp(-x))^(-1)}
+  gauss.inv <- function(x){-log((1/x)-1)}
+  bfgs.transform <- function(x){1/2*(1 + gauss(x))}
+  bfgs.transform.inv <- function(x){gauss.inv(x*2-1)}
 
-
-# The BFGS method does converge when using a special parameterization 
-# such that par[1:2] can fall in region [0.5,1] and par[3] can fall in region [0, +inf]
-# bfgs.optim <- optim(par=c(0.8750721,3.680101, 2.0109), 
-#               fn=jonsson.model.bfgs, 
-#               method="BFGS", 
-#               control=list(trace=TRUE))
-
-# Convergence in 13 function calls, 6 gradient calls...
-#           Gamma     Lambda    Tau          
-# Start Val 0.8750721 3.680101  2.0109  
-# equals... 0.8529    0.9877    7.47
-
-# Output:   1.025308  3.247043 2.545327
-# equals... 0.8680026 0.9812834 12.7474
-
-# Final RMSE: 8.543875
+  jonsson.model.bfgs <- function(par){
+    trpar <- matrix(nrow = 3, ncol = 1)
+    trpar[1] <- bfgs.transform(par[1])
+    trpar[2] <- bfgs.transform(par[2])
+    trpar[3] <- exp(par[3])
+    jonsson.model(trpar, TRUE, TRUE)
+  }
   
+  # The BFGS method converges when using a special parameterization 
+  # such that par[1:2] can fall in region [0.5,1] and par[3] can fall in region [0, +inf]
+  # bfgs.optim <- optim(par=c(0.8750721,3.680101, 2.0109), 
+  #               fn=jonsson.model.bfgs, 
+  #               method="BFGS", 
+  #               control=list(trace=TRUE))
+
+  # Optimal values in jonsson article
+  # gamma   = 0.8529
+  # lambda  = 0.9877
+  # tau     = 55.67/7.45 = 7.47
+  
+############################################
+### Run model with fixed tune parameters ###
+############################################
   gamma = c(0.8680026)
   lambda = c(0.9812834)
   tau = c(12.7474)
@@ -343,7 +341,7 @@ jonsson.model.bfgs <- function(par){
     ptmA <- Sys.time()
     
     # Do model
-    container[i,4:5] <- jonsson.model(c(glt[i,1], glt[i,2], glt[i,3]), printInfo=TRUE)
+    container[i,4:5] <- jonsson.model(c(glt[i,1], glt[i,2], glt[i,3]), printInfo=TRUE, rmseOnly=FALSE)
     
     # Write runtime
     container[i,6] <- as.numeric(Sys.time() - ptmA, units='secs')

@@ -1,22 +1,18 @@
-# Master Thesis
-My master thesis "Evaluating Forecasts of Volatile Electricity Prices made by Competing Models".
+# Introduction
+This repo holds data and forecasts related to my master thesis on forecasting the epex spot electricity price, and a slightly updated version of the thesis.
 
-### thesis.pdf
-The main goals of the thesis are 
+In addition, it holds a short follow-up study which expands the forecast results to new 2015 data.
 
-1. provide an introduction to the german electricity market with a focus on how fundamentals affect prices through supply/demand effects. 
-2. give an overview of available data and data sources.
-3. compare different machine learning and statistical methods for forecasting electricity prices.
+## master-thesis
+Holds old data and forecasts related to the original thesis.
 
-### jonsson.R
-Contains the code that implements the Jonsson et al. (2013) local linear approximation model for forecasting the epex spot day-ahead price. The code is completely raw, so it requires some understanding and tweaking. 
+## follow-up-study
+Holds updated data including 2015. Furthermore, I included forecasts and working code snippets for running the models (give me a heads up if they don't work).
 
-1. Optimize the model in the train period using modified BFGS to obtain values for the 3 tuning parameters (or skip this step and just use the values provided, which should be resonable if data is similiar). 
-2. Run the model for train+test period with optimized parameters to get forecasts.
+## About
+During my studies I worked for an electricity trading company where I gained some knowledge of German electricity markets. The main motivation for making this repo available, was to distribute some of that domain knowledge to researchers interested in this field.
 
-### tso-data.csv
-The data included are only the publicly available data (TSO forecasts of fundamentals and EXAA prices), so anyone interested in testing electricity price forecasting models will have to get EPEX prices from another source (check [EPEX SPOT](http://www.epexspot.com) or [ENTSOE](http://transparency.entsoe.eu)).
+I learned R during the project, so most code is not very neatly written. I hope you can look past that. As always: I take no responsibility for the correctnes of the information in this repository.
 
-The data covers forecast wind, forecast solar, and forecast consumption taken from the TSO's, and realized prices for the Austrian exchange EXAA. All for the period 01-11-2012 to 31-12-2014. For a list of sources and a description of the preprocessing applied see thesis.pdf. For newer data check ENTSOE and EXAA.
+Lastly, after finishing my studies I started working in another industry, so no further updates are likely. So long and thanks for all the fish :)
 
-If you have proprietary forecast data, good for you. You will likely get marginally worse forecast performance using this data than the TSO forecasts, as the TSO's have pretty good forecast aggregation schemes (to the best of my knowledge). And remember, when forecasting DA prices you are not interested in how precise your forecast is compared to the realized fundamentals. You want to forecast the market players expectations of fundamentals (which are difficult to know).
